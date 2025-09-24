@@ -45,12 +45,7 @@ function Footer() {
           <div>
             <h4 className="font-semibold mb-4">Download App</h4>
             <div className="flex space-x-4">
-              <button className="bg-purple-600 px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-                Google Play
-              </button>
-              <button className="bg-gray-700 px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
-                App Store
-              </button>
+            
             </div>
           </div>
         </div>
