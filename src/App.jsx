@@ -16,7 +16,7 @@ const Home = () => (
                 LendPlus Loan App
               </span> */}
               <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
-                Get first loan online within{" "}
+                Get first loan online {" "}
                 <span className="bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
                   With  a Trusted Lender
                 </span>
