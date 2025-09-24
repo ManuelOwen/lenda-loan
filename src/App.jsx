@@ -18,7 +18,7 @@ const Home = () => (
               <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
                 Get first loan online within{" "}
                 <span className="bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
-                  15 minutes
+                  With  a Trusted Lender
                 </span>
               </h1>
               <p className="text-xl text-gray-600 mb-8">
