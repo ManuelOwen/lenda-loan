@@ -10,6 +10,7 @@ function Loan() {
     phone: "",
     loan_amount: "",
   });
+  const [customAmount, setCustomAmount] = useState("");
 
   const loanOptions = [
     { range: "0 - 1,000", fee: 10, min: 0, max: 1000 },
@@ -20,6 +21,18 @@ function Loan() {
     { range: "10,000 - 15,000", fee: 2000, min: 10000, max: 15000 },
   ];
 
+  const calculateFee = (amount) => {
+    const loanAmount = parseInt(amount.replace(/,/g, "")) || 0;
+
+    if (loanAmount <= 1000) return 10;
+    if (loanAmount <= 3500) return 300;
+    if (loanAmount <= 6000) return 600;
+    if (loanAmount <= 8000) return 1000;
+    if (loanAmount <= 10000) return 1250;
+    if (loanAmount <= 15000) return 2000;
+    return 2000; // Default fee for amounts above 15,000
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
@@ -28,8 +41,17 @@ function Loan() {
     }));
   };
 
+  const handleCustomAmountChange = (e) => {
+    const value = e.target.value.replace(/,/g, "");
+    if (value === "" || /^\d+$/.test(value)) {
+      setCustomAmount(value);
+      setSelectedLoan(null);
+    }
+  };
+
   const handleLoanSelect = (loan) => {
     setSelectedLoan(loan);
+    setCustomAmount("");
     setFormData((prevState) => ({
       ...prevState,
       loan_amount: loan.range,
@@ -38,21 +60,68 @@ function Loan() {
     setShowForm(true);
   };
 
+  const handleCustomAmountSubmit = () => {
+    if (customAmount && parseInt(customAmount) > 0) {
+      const amount = parseInt(customAmount);
+      const fee = calculateFee(customAmount);
+
+      setSelectedLoan({
+        range: `Custom: ${formatAmount(amount)}`,
+        fee: fee,
+        min: amount,
+        max: amount,
+        custom: true,
+      });
+
+      setFormData((prevState) => ({
+        ...prevState,
+        loan_amount: amount.toLocaleString(),
+      }));
+
+      setShowLoanOptions(false);
+      setShowForm(true);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Form submitted:", formData, "Selected loan:", selectedLoan);
+    const loanAmount = selectedLoan?.custom ? customAmount : selectedLoan?.max;
+    const fee = selectedLoan?.fee || calculateFee(customAmount);
+
+    console.log(
+      "Form submitted:",
+      formData,
+      "Loan amount:",
+      loanAmount,
+      "Fee:",
+      fee
+    );
     alert(
-      `Loan application submitted successfully!\nLoan Amount: KSH ${selectedLoan.range}\nService Fee: KSH ${selectedLoan.fee}`
+      `Loan application submitted successfully!\nLoan Amount: KSH ${formatAmount(
+        loanAmount
+      )}\nService Fee: KSH ${fee.toLocaleString()}`
     );
     setShowForm(false);
     setShowLoanOptions(false);
     setSelectedLoan(null);
+    setCustomAmount("");
     setFormData({ full_name: "", email: "", phone: "", loan_amount: "" });
   };
 
   const handleApplyLoan = () => {
     setShowLoanOptions(true);
   };
+
+  const formatAmount = (amount) => {
+    return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+
+  const currentFee = customAmount
+    ? calculateFee(customAmount)
+    : selectedLoan?.fee || 0;
+  const loanAmountValue = selectedLoan?.custom
+    ? customAmount
+    : selectedLoan?.max || "";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white pt-16 md:pt-20">
@@ -138,10 +207,40 @@ function Loan() {
                   </button>
                 </div>
 
+                {/* Custom Amount Input */}
+                <div className="mb-6 md:mb-8 p-4 md:p-6 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4">
+                    Enter Your Desired Amount
+                  </h3>
+                  <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={customAmount ? formatAmount(customAmount) : ""}
+                        onChange={handleCustomAmountChange}
+                        placeholder="Enter amount in KSH"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm md:text-base"
+                      />
+                    </div>
+                    <button
+                      onClick={handleCustomAmountSubmit}
+                      disabled={!customAmount || parseInt(customAmount) <= 0}
+                      className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm md:text-base whitespace-nowrap"
+                    >
+                      Continue with Amount
+                    </button>
+                  </div>
+                  {customAmount && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      Service Fee: KSH{" "}
+                      {calculateFee(customAmount).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
                 <div className="mb-4 md:mb-6">
                   <p className="text-gray-600 text-sm md:text-base lg:text-lg">
-                    Select your desired loan amount and see the corresponding
-                    service fee:
+                    Or select from our predefined loan amounts:
                   </p>
                 </div>
 
@@ -169,13 +268,13 @@ function Loan() {
                   ))}
                 </div>
 
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 md:p-4 mb-3 md:mb-4">
+                <div className="bg-green-50 border-l-4 border-green-400 p-3 md:p-4 mb-3 md:mb-4">
                   <div className="flex">
                     <div className="ml-2">
-                      <p className="text-xs md:text-sm text-yellow-700">
-                        <strong>Note:</strong> The service fee will be deducted
-                        from your loan amount. Please choose an amount that
-                        suits your needs.
+                      <p className="text-xs md:text-sm text-green-700">
+                        <strong>Important:</strong> The service fee is separate
+                        and will not be added to your loan amount. You only pay
+                        back the loan amount you receive.
                       </p>
                     </div>
                   </div>
@@ -205,14 +304,16 @@ function Loan() {
                       Loan Application
                     </h2>
                     <p className="text-purple-600 font-semibold mt-1 text-sm md:text-base">
-                      Selected: KSH {selectedLoan.range} (Fee: KSH{" "}
-                      {selectedLoan.fee.toLocaleString()})
+                      {selectedLoan.custom
+                        ? `Amount: KSH ${formatAmount(customAmount)}`
+                        : `Selected: KSH ${selectedLoan.range}`}
                     </p>
                   </div>
                   <button
                     onClick={() => {
                       setShowForm(false);
                       setSelectedLoan(null);
+                      setCustomAmount("");
                     }}
                     className="text-gray-500 hover:text-gray-700 text-2xl md:text-3xl flex-shrink-0"
                   >
@@ -281,31 +382,73 @@ function Loan() {
                     />
                   </div>
 
+                  <div>
+                    <label
+                      htmlFor="loan_amount"
+                      className="block text-sm md:text-base font-medium text-gray-700 mb-1 md:mb-2"
+                    >
+                      Loan Amount Needed (KSH)
+                    </label>
+                    <input
+                      type="text"
+                      id="loan_amount"
+                      name="loan_amount"
+                      value={
+                        selectedLoan.custom
+                          ? formatAmount(customAmount)
+                          : selectedLoan.range
+                      }
+                      readOnly
+                      className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg bg-gray-50 text-sm md:text-base"
+                    />
+                  </div>
+
                   <div className="bg-gray-50 rounded-lg p-3 md:p-4">
                     <h4 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">
                       Loan Summary
                     </h4>
-                    <div className="flex justify-between text-xs md:text-sm text-gray-600 mb-1">
-                      <span>Loan Amount:</span>
-                      <span className="font-semibold">
-                        KSH {selectedLoan.range}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs md:text-sm text-gray-600 mb-1">
-                      <span>Service Fee:</span>
-                      <span className="font-semibold">
-                        KSH {selectedLoan.fee.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="border-t border-gray-200 mt-2 pt-2">
-                      <div className="flex justify-between text-xs md:text-sm font-semibold text-purple-700">
-                        <span>Amount to Receive:</span>
-                        <span>
-                          KSH{" "}
-                          {(
-                            selectedLoan.max - selectedLoan.fee
-                          ).toLocaleString()}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs md:text-sm">
+                        <span className="text-gray-600">
+                          Amount to Receive:
                         </span>
+                        <span className="font-semibold text-green-700">
+                          KSH{" "}
+                          {selectedLoan.custom
+                            ? formatAmount(customAmount)
+                            : selectedLoan.range}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs md:text-sm">
+                        <span className="text-gray-600">Service Fee:</span>
+                        <span className="font-semibold text-purple-700">
+                          KSH {currentFee.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="border-t border-gray-200 pt-2 mt-2">
+                        <div className="flex justify-between text-xs md:text-sm">
+                          <span className="text-gray-600 font-semibold">
+                            Amount to Pay Back:
+                          </span>
+                          <span className="font-bold text-green-700">
+                            KSH{" "}
+                            {selectedLoan.custom
+                              ? formatAmount(customAmount)
+                              : selectedLoan.range}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-3 md:p-4">
+                    <div className="flex">
+                      <div className="ml-2">
+                        <p className="text-xs md:text-sm text-blue-700">
+                          <strong>Note:</strong> The service fee is separate and
+                          will be processed upfront. You only need to pay back
+                          the loan amount shown above.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -316,6 +459,7 @@ function Loan() {
                       onClick={() => {
                         setShowForm(false);
                         setSelectedLoan(null);
+                        setCustomAmount("");
                         setShowLoanOptions(true);
                       }}
                       className="flex-1 px-4 py-2 md:px-6 md:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium text-sm md:text-base"
@@ -326,7 +470,7 @@ function Loan() {
                       type="submit"
                       className="flex-1 px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 font-medium text-sm md:text-base"
                     >
-                      Submit
+                      Submit Application
                     </button>
                   </div>
                 </form>
