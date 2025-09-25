@@ -6,7 +6,7 @@ import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar"; // Make sure this import path is correct
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
-import Advantages from "./pages/Advantages";
+// import Advantages from "./pages/Advantages";
 import HowToBorrow from "./pages/HowToBorrow";
 import Loans from "./pages/Loan";
 import Promotions from "./pages/Promotions";
@@ -19,7 +19,7 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/advantages" element={<Advantages />} />
+          {/* <Route path="/advantages" element={<Advantages />} /> */}
           <Route path="/how-to-borrow" element={<HowToBorrow />} />
           <Route path="/loans" element={<Loans />} />
           <Route path="/promotions" element={<Promotions />} />

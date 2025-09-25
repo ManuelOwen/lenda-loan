@@ -30,18 +30,8 @@ function Navbar() {
             >
               Home
             </Link>
-            <Link
-              to="/advantages"
-              className="text-white hover:text-purple-200 transition-colors font-medium"
-            >
-              Advantages
-            </Link>
-            <Link
-              to="/how-to-borrow"
-              className="text-white hover:text-purple-200 transition-colors font-medium"
-            >
-              How to Borrow
-            </Link>
+          
+           
             <Link
               to="/loans"
               className="text-white hover:text-purple-200 transition-colors font-medium"
@@ -81,20 +71,8 @@ function Navbar() {
             >
               Home
             </Link>
-            <Link
-              to="/advantages"
-              className="block py-3 px-4 text-white hover:bg-purple-600 transition-colors"
-              onClick={closeMobileMenu}
-            >
-              Advantages
-            </Link>
-            <Link
-              to="/how-to-borrow"
-              className="block py-3 px-4 text-white hover:bg-purple-600 transition-colors"
-              onClick={closeMobileMenu}
-            >
-              How to Borrow
-            </Link>
+           
+            
             <Link
               to="/loans"
               className="block py-3 px-4 text-white hover:bg-purple-600 transition-colors"

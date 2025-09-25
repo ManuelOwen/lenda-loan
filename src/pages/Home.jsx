@@ -17,9 +17,8 @@ function Home() {
             {/* Left Content */}
             <div className="relative z-10">
               <div className="mb-6">
-                <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6 bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
-                  Get first loan online{" "}
-                
+                <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6 bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text ">
+                  Get first loan online
                 </h1>
                 <p className="text-xl text-gray-600 mb-8">
                   Fast and safe apply process with instant approval. Get the
@@ -63,7 +62,7 @@ function Home() {
                   </div>
                   <h3 className="text-2xl font-bold mb-4">Loan Amount</h3>
                   <div className="text-4xl font-bold mb-2">
-                    KSH 1,000 - KSH 50,000
+                    KSH 15,000 - KSH 50,000
                   </div>
                   <p className="text-purple-100">Flexible repayment terms</p>
                 </div>
@@ -213,6 +212,57 @@ function Home() {
             >
               Read More Success Stories
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Advantages Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-5xl font-bold text-gray-900 mb-8 text-center">
+            Our Advantages
+          </h1>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            {[
+              {
+                title: "Fast Processing",
+                description:
+                  "Get your loan approved within 15 minutes with our automated system.",
+                icon: "⚡",
+              },
+              {
+                title: "Low Interest Rates",
+                description:
+                  "Competitive rates starting from just 1.95% with flexible terms.",
+                icon: "💰",
+              },
+              {
+                title: "No Hidden Fees",
+                description:
+                  "Transparent pricing with no surprise charges or fees.",
+                icon: "🔍",
+              },
+              {
+                title: "24/7 Support",
+                description:
+                  "Round-the-clock customer support for all your queries.",
+                icon: "📞",
+              },
+            ].map((advantage, index) => (
+              <div
+                key={index}
+                className="bg-white p-8 rounded-2xl shadow-lg border border-purple-100 hover:shadow-xl transition-shadow"
+              >
+                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center text-2xl text-white mb-4">
+                  {advantage.icon}
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  {advantage.title}
+                </h3>
+                <p className="text-gray-600 text-lg">{advantage.description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
