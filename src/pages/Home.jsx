@@ -62,7 +62,7 @@ function Home() {
                   </div>
                   <h3 className="text-2xl font-bold mb-4">Loan Amount</h3>
                   <div className="text-4xl font-bold mb-2">
-                    KSH 15,000 - KSH 50,000
+                    KSH 100 - KSH 15,000
                   </div>
                   <p className="text-purple-100">Flexible repayment terms</p>
                 </div>
