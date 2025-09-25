@@ -17,11 +17,9 @@ function Home() {
             {/* Left Content */}
             <div className="relative z-10">
               <div className="mb-6">
-                <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6 bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
                   Get first loan online{" "}
-                  <span className="bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
-                    With a Trusted Lender
-                  </span>
+                
                 </h1>
                 <p className="text-xl text-gray-600 mb-8">
                   Fast and safe apply process with instant approval. Get the
