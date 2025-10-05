@@ -1,16 +1,56 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+// Zod validation schema
+const loanApplicationSchema = z.object({
+  full_name: z
+    .string()
+    .min(2, "Full name must be at least 2 characters")
+    .max(100, "Full name must be less than 100 characters")
+    .regex(/^[a-zA-Z\s]+$/, "Full name can only contain letters and spaces"),
+  email: z.email("Please enter a valid email address"),
+  phone: z
+    .string()
+    .regex(
+      /^\+254[17]\d{8}$/,
+      "Phone number must start with +2547 or +2541 and be 13 digits total"
+    )
+    .refine((phone) => {
+      // Additional validation for Kenyan phone numbers
+      const phoneNumber = phone.replace("+254", "");
+      return phoneNumber.length === 9 && /^[17]/.test(phoneNumber);
+    }, "Invalid Kenyan phone number format"),
+  loan_amount: z.string().min(1, "Loan amount is required"),
+});
 
 function Loan() {
   const [showForm, setShowForm] = useState(false);
   const [showLoanOptions, setShowLoanOptions] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
-  const [formData, setFormData] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    loan_amount: "",
-  });
   const [customAmount, setCustomAmount] = useState("");
+  const [transactionStatus, setTransactionStatus] = useState(null);
+  const [transactionId, setTransactionId] = useState(null);
+  const [pollingCount, setPollingCount] = useState(0);
+
+  // Initialize React Hook Form with Zod resolver
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(loanApplicationSchema),
+    defaultValues: {
+      full_name: "",
+      email: "",
+      phone: "",
+      loan_amount: "",
+    },
+  });
 
   const loanOptions = [
     { range: "0 - 1,000", fee: 10, min: 0, max: 1000 },
@@ -21,6 +61,76 @@ function Loan() {
     { range: "10,000 - 15,000", fee: 2000, min: 10000, max: 15000 },
   ];
 
+  // Watch form values
+  const formData = watch();
+
+  // Phone number input handler with automatic formatting
+  const handlePhoneChange = (e) => {
+    let value = e.target.value.replace(/\D/g, ""); // Remove non-digits
+
+    // Auto-format to +254 format
+    if (value.startsWith("254")) {
+      value = "+" + value;
+    } else if (value.startsWith("07") || value.startsWith("01")) {
+      value = "+254" + value.slice(1);
+    } else if (value.startsWith("7") || value.startsWith("1")) {
+      value = "+254" + value;
+    }
+
+    // Limit to 13 characters (+254 followed by 9 digits)
+    if (value.length > 13) {
+      value = value.slice(0, 13);
+    }
+
+    setValue("phone", value, { shouldValidate: true });
+  };
+
+  // Polling effect for transaction status
+  useEffect(() => {
+    let intervalId;
+
+    if (transactionStatus === "pending" && transactionId) {
+      intervalId = setInterval(() => {
+        checkTransactionStatus();
+        setPollingCount((prev) => prev + 1);
+      }, 1000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [transactionStatus, transactionId]);
+
+  const checkTransactionStatus = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/v1/payments/status/${transactionId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+
+        if (data.status === "completed") {
+          setTransactionStatus("completed");
+        } else if (data.status === "failed") {
+          setTransactionStatus("failed");
+        }
+      } else {
+        console.error("Failed to check transaction status");
+      }
+    } catch (error) {
+      console.error("Error checking transaction status:", error);
+    }
+  };
+
   const calculateFee = (amount) => {
     const loanAmount = parseInt(amount.replace(/,/g, "")) || 0;
 
@@ -30,15 +140,7 @@ function Loan() {
     if (loanAmount <= 8000) return 1000;
     if (loanAmount <= 10000) return 1250;
     if (loanAmount <= 15000) return 2000;
-    return 2000; // Default fee for amounts above 15,000
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+    return 2000;
   };
 
   const handleCustomAmountChange = (e) => {
@@ -52,10 +154,7 @@ function Loan() {
   const handleLoanSelect = (loan) => {
     setSelectedLoan(loan);
     setCustomAmount("");
-    setFormData((prevState) => ({
-      ...prevState,
-      loan_amount: loan.range,
-    }));
+    setValue("loan_amount", loan.range, { shouldValidate: true });
     setShowLoanOptions(false);
     setShowForm(true);
   };
@@ -73,39 +172,64 @@ function Loan() {
         custom: true,
       });
 
-      setFormData((prevState) => ({
-        ...prevState,
-        loan_amount: amount.toLocaleString(),
-      }));
-
+      setValue("loan_amount", amount.toLocaleString(), {
+        shouldValidate: true,
+      });
       setShowLoanOptions(false);
       setShowForm(true);
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const submitLoanApplication = async (applicationData) => {
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/loans", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(applicationData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, data };
+      } else {
+        const errorData = await response.json();
+        return {
+          success: false,
+          error: errorData.message || "Failed to submit application",
+        };
+      }
+    } catch (error) {
+      return { success: false, error: "Network error: " + error.message };
+    }
+  };
+
+  // Form submission handler
+  const onSubmit = async (data) => {
     const loanAmount = selectedLoan?.custom ? customAmount : selectedLoan?.max;
     const fee = selectedLoan?.fee || calculateFee(customAmount);
 
-    console.log(
-      "Form submitted:",
-      formData,
-      "Loan amount:",
-      loanAmount,
-      "Fee:",
-      fee
-    );
-    alert(
-      `Loan application submitted successfully!\nLoan Amount: KSH ${formatAmount(
-        loanAmount
-      )}\nService Fee: KSH ${fee.toLocaleString()}`
-    );
-    setShowForm(false);
-    setShowLoanOptions(false);
-    setSelectedLoan(null);
-    setCustomAmount("");
-    setFormData({ full_name: "", email: "", phone: "", loan_amount: "" });
+    // Prepare data for backend
+    const applicationData = {
+      ...data,
+      loan_amount: parseInt(loanAmount.toString().replace(/,/g, "")),
+      service_fee: fee,
+    };
+
+    // Set transaction to pending state
+    setTransactionStatus("pending");
+
+    // Submit to backend
+    const result = await submitLoanApplication(applicationData);
+    console.log
+
+    if (result.success) {
+      setTransactionId(result.data.transactionId);
+    } else {
+      setTransactionStatus("failed");
+      alert(`Application failed: ${result.error}`);
+    }
   };
 
   const handleApplyLoan = () => {
@@ -116,12 +240,102 @@ function Loan() {
     return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
+  const resetForm = () => {
+    setShowForm(false);
+    setShowLoanOptions(false);
+    setSelectedLoan(null);
+    setCustomAmount("");
+    reset();
+    setTransactionStatus(null);
+    setTransactionId(null);
+    setPollingCount(0);
+  };
+
   const currentFee = customAmount
     ? calculateFee(customAmount)
     : selectedLoan?.fee || 0;
   const loanAmountValue = selectedLoan?.custom
     ? customAmount
     : selectedLoan?.max || "";
+
+  // Loading spinner component
+  const LoadingSpinner = () => (
+    <div className="flex flex-col items-center justify-center p-8">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mb-4"></div>
+      <p className="text-gray-700 font-medium">
+        Processing your application...
+      </p>
+      <p className="text-gray-500 text-sm mt-2">
+        Checking status ({pollingCount}s)
+      </p>
+    </div>
+  );
+
+  // Success component
+  const SuccessMessage = () => (
+    <div className="flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+        <svg
+          className="w-8 h-8 text-green-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M5 13l4 4L19 7"
+          ></path>
+        </svg>
+      </div>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">
+        Application Successful!
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Your loan application has been processed successfully.
+      </p>
+      <button
+        onClick={resetForm}
+        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+      >
+        Apply for Another Loan
+      </button>
+    </div>
+  );
+
+  // Error component
+  const ErrorMessage = () => (
+    <div className="flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+        <svg
+          className="w-8 h-8 text-red-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M6 18L18 6M6 6l12 12"
+          ></path>
+        </svg>
+      </div>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">
+        Application Failed
+      </h3>
+      <p className="text-gray-600 mb-4">
+        There was an error processing your application. Please try again.
+      </p>
+      <button
+        onClick={resetForm}
+        className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+      >
+        Try Again
+      </button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white pt-16 md:pt-20">
@@ -294,7 +508,7 @@ function Loan() {
         )}
 
         {/* Loan Application Form */}
-        {showForm && selectedLoan && (
+        {showForm && selectedLoan && transactionStatus === null && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4 z-50">
             <div className="bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto max-h-[90vh] overflow-y-auto">
               <div className="p-4 md:p-6">
@@ -310,11 +524,7 @@ function Loan() {
                     </p>
                   </div>
                   <button
-                    onClick={() => {
-                      setShowForm(false);
-                      setSelectedLoan(null);
-                      setCustomAmount("");
-                    }}
+                    onClick={resetForm}
                     className="text-gray-500 hover:text-gray-700 text-2xl md:text-3xl flex-shrink-0"
                   >
                     ×
@@ -322,8 +532,9 @@ function Loan() {
                 </div>
 
                 <form
-                  onSubmit={handleSubmit}
+                  onSubmit={handleSubmit(onSubmit)}
                   className="space-y-4 md:space-y-6"
+                  noValidate
                 >
                   <div>
                     <label
@@ -335,13 +546,17 @@ function Loan() {
                     <input
                       type="text"
                       id="full_name"
-                      name="full_name"
-                      value={formData.full_name}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm md:text-base"
+                      {...register("full_name")}
+                      className={`w-full px-3 py-2 md:px-4 md:py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm md:text-base ${
+                        errors.full_name ? "border-red-500" : "border-gray-300"
+                      }`}
                       placeholder="Enter your full name"
                     />
+                    {errors.full_name && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.full_name.message}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -354,13 +569,17 @@ function Loan() {
                     <input
                       type="email"
                       id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm md:text-base"
+                      {...register("email")}
+                      className={`w-full px-3 py-2 md:px-4 md:py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm md:text-base ${
+                        errors.email ? "border-red-500" : "border-gray-300"
+                      }`}
                       placeholder="Enter your email"
                     />
+                    {errors.email && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.email.message}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -373,13 +592,21 @@ function Loan() {
                     <input
                       type="tel"
                       id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm md:text-base"
-                      placeholder="Enter your phone number"
+                      {...register("phone")}
+                      onChange={handlePhoneChange}
+                      className={`w-full px-3 py-2 md:px-4 md:py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm md:text-base ${
+                        errors.phone ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="+2547XXXXXXXX or +2541XXXXXXXX"
                     />
+                    {errors.phone && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.phone.message}
+                      </p>
+                    )}
+                    <p className="text-gray-500 text-xs mt-1">
+                      Format: +2547XXXXXXXX or +2541XXXXXXXX
+                    </p>
                   </div>
 
                   <div>
@@ -392,12 +619,7 @@ function Loan() {
                     <input
                       type="text"
                       id="loan_amount"
-                      name="loan_amount"
-                      value={
-                        selectedLoan.custom
-                          ? formatAmount(customAmount)
-                          : selectedLoan.range
-                      }
+                      {...register("loan_amount")}
                       readOnly
                       className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg bg-gray-50 text-sm md:text-base"
                     />
@@ -468,13 +690,25 @@ function Loan() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 font-medium text-sm md:text-base"
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 font-medium text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Submit Application
+                      {isSubmitting ? "Submitting..." : "Submit Application"}
                     </button>
                   </div>
                 </form>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Transaction Status Modal */}
+        {transactionStatus && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4 z-50">
+            <div className="bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
+              {transactionStatus === "pending" && <LoadingSpinner />}
+              {transactionStatus === "completed" && <SuccessMessage />}
+              {transactionStatus === "failed" && <ErrorMessage />}
             </div>
           </div>
         )}
