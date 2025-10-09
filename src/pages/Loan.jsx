@@ -81,7 +81,7 @@ function Loan() {
     const checkTransactionStatus = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8800/api/v1/payments/status/${transactionId}`,
+          `https://lenda-api.onrender.com/api/v1/payments/status/${transactionId}`,
           {
             method: "GET",
             headers: {
@@ -172,7 +172,7 @@ function Loan() {
 
   const submitLoanApplication = async (applicationData) => {
     try {
-      const response = await fetch("http://localhost:8800/api/v1/loans", {
+      const response = await fetch("https://lenda-api.onrender.com/api/v1/loans", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
