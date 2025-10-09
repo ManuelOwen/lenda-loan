@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-// Zod validation schema
 const loanApplicationSchema = z.object({
   full_name: z
     .string()
@@ -18,7 +17,6 @@ const loanApplicationSchema = z.object({
       "Phone number must start with +2547 or +2541 and be 13 digits total"
     )
     .refine((phone) => {
-      // Additional validation for Kenyan phone numbers
       const phoneNumber = phone.replace("+254", "");
       return phoneNumber.length === 9 && /^[17]/.test(phoneNumber);
     }, "Invalid Kenyan phone number format"),
@@ -34,12 +32,10 @@ function Loan() {
   const [transactionId, setTransactionId] = useState(null);
   const [pollingCount, setPollingCount] = useState(0);
 
-  // Initialize React Hook Form with Zod resolver
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm({
@@ -53,7 +49,7 @@ function Loan() {
   });
 
   const loanOptions = [
-    { range: "0 - 1,000", fee: 10, min: 0, max: 1000 },
+    { range: "0 - 1,000", fee: 1, min: 0, max: 1000 },
     { range: "1,000 - 3,500", fee: 300, min: 1000, max: 3500 },
     { range: "3,500 - 6,000", fee: 600, min: 3500, max: 6000 },
     { range: "6,000 - 8,000", fee: 1000, min: 6000, max: 8000 },
@@ -61,14 +57,9 @@ function Loan() {
     { range: "10,000 - 15,000", fee: 2000, min: 10000, max: 15000 },
   ];
 
-  // Watch form values
-  const formData = watch();
-
-  // Phone number input handler with automatic formatting
   const handlePhoneChange = (e) => {
-    let value = e.target.value.replace(/\D/g, ""); // Remove non-digits
+    let value = e.target.value.replace(/\D/g, "");
 
-    // Auto-format to +254 format
     if (value.startsWith("254")) {
       value = "+" + value;
     } else if (value.startsWith("07") || value.startsWith("01")) {
@@ -77,7 +68,6 @@ function Loan() {
       value = "+254" + value;
     }
 
-    // Limit to 13 characters (+254 followed by 9 digits)
     if (value.length > 13) {
       value = value.slice(0, 13);
     }
@@ -85,15 +75,43 @@ function Loan() {
     setValue("phone", value, { shouldValidate: true });
   };
 
-  // Polling effect for transaction status
   useEffect(() => {
     let intervalId;
+
+    const checkTransactionStatus = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8800/api/v1/payments/status/${transactionId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(data)
+
+          if (data.status === "success") {
+            setTransactionStatus("success");
+          } else if (data.status === "failed") {
+            setTransactionStatus("failed");
+          }
+        } else {
+          console.error("Failed to check transaction status");
+        }
+      } catch (error) {
+        console.error("Error checking transaction status:", error);
+      }
+    };
 
     if (transactionStatus === "pending" && transactionId) {
       intervalId = setInterval(() => {
         checkTransactionStatus();
         setPollingCount((prev) => prev + 1);
-      }, 1000);
+      }, 2000);
     }
 
     return () => {
@@ -103,38 +121,10 @@ function Loan() {
     };
   }, [transactionStatus, transactionId]);
 
-  const checkTransactionStatus = async () => {
-    try {
-      const response = await fetch(
-        `http://localhost:8800/api/v1/payments/status/${transactionId}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-
-        if (data.status === "completed") {
-          setTransactionStatus("completed");
-        } else if (data.status === "failed") {
-          setTransactionStatus("failed");
-        }
-      } else {
-        console.error("Failed to check transaction status");
-      }
-    } catch (error) {
-      console.error("Error checking transaction status:", error);
-    }
-  };
-
   const calculateFee = (amount) => {
     const loanAmount = parseInt(amount.replace(/,/g, "")) || 0;
 
-    if (loanAmount <= 1000) return 10;
+    if (loanAmount <= 1000) return 1;
     if (loanAmount <= 3500) return 300;
     if (loanAmount <= 6000) return 600;
     if (loanAmount <= 8000) return 1000;
@@ -205,27 +195,23 @@ function Loan() {
     }
   };
 
-  // Form submission handler
   const onSubmit = async (data) => {
     const loanAmount = selectedLoan?.custom ? customAmount : selectedLoan?.max;
     const fee = selectedLoan?.fee || calculateFee(customAmount);
 
-    // Prepare data for backend
     const applicationData = {
       ...data,
       loan_amount: parseInt(loanAmount.toString().replace(/,/g, "")),
       service_fee: fee,
     };
 
-    // Set transaction to pending state
     setTransactionStatus("pending");
 
-    // Submit to backend
     const result = await submitLoanApplication(applicationData);
-    console.log
+    console.log(result);
 
     if (result.success) {
-      setTransactionId(result.data.transactionId);
+      setTransactionId(result.data.data.stkResponse.external_reference);
     } else {
       setTransactionStatus("failed");
       alert(`Application failed: ${result.error}`);
@@ -254,11 +240,7 @@ function Loan() {
   const currentFee = customAmount
     ? calculateFee(customAmount)
     : selectedLoan?.fee || 0;
-  const loanAmountValue = selectedLoan?.custom
-    ? customAmount
-    : selectedLoan?.max || "";
 
-  // Loading spinner component
   const LoadingSpinner = () => (
     <div className="flex flex-col items-center justify-center p-8">
       <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mb-4"></div>
@@ -271,7 +253,6 @@ function Loan() {
     </div>
   );
 
-  // Success component
   const SuccessMessage = () => (
     <div className="flex flex-col items-center justify-center p-8 text-center">
       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -304,7 +285,6 @@ function Loan() {
     </div>
   );
 
-  // Error component
   const ErrorMessage = () => (
     <div className="flex flex-col items-center justify-center p-8 text-center">
       <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -707,7 +687,7 @@ function Loan() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4 z-50">
             <div className="bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
               {transactionStatus === "pending" && <LoadingSpinner />}
-              {transactionStatus === "completed" && <SuccessMessage />}
+              {transactionStatus === "success" && <SuccessMessage />}
               {transactionStatus === "failed" && <ErrorMessage />}
             </div>
           </div>
