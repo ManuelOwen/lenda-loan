@@ -49,7 +49,7 @@ function Loan() {
   });
 
   const loanOptions = [
-    { range: "0 - 1,000", fee: 1, min: 0, max: 1000 },
+    { range: "0 - 1,000", fee: 100, min: 0, max: 1000 },
     { range: "1,000 - 3,500", fee: 300, min: 1000, max: 3500 },
     { range: "3,500 - 6,000", fee: 600, min: 3500, max: 6000 },
     { range: "6,000 - 8,000", fee: 1000, min: 6000, max: 8000 },
