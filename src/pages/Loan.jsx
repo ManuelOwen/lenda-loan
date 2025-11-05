@@ -124,7 +124,7 @@ function Loan() {
   const calculateFee = (amount) => {
     const loanAmount = parseInt(amount.replace(/,/g, "")) || 0;
 
-    if (loanAmount <= 1000) return 1;
+    if (loanAmount <= 1000) return 100;
     if (loanAmount <= 3500) return 300;
     if (loanAmount <= 6000) return 600;
     if (loanAmount <= 8000) return 1000;
