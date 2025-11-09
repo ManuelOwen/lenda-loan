@@ -210,7 +210,7 @@ function Loan() {
             message: `Amount must be between ${selectedLoan.min.toLocaleString()} and ${selectedLoan.max.toLocaleString()}`
           });
         } else {
-  
+
           setError("loan_amount", {});
         }
       }
@@ -252,7 +252,6 @@ function Loan() {
       setTransactionStatus("failed");
 
       if (result.statusCode === 409) {
-
         setApiError(result.error.message?.message || "An application with this email already exists");
         setError("email", {
           type: "manual",
