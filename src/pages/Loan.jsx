@@ -9,7 +9,7 @@ const loanApplicationSchema = z.object({
     .min(2, "Full name must be at least 2 characters")
     .max(100, "Full name must be less than 100 characters")
     .regex(/^[a-zA-Z\s]+$/, "Full name can only contain letters and spaces"),
-  email: z.email("Please enter a valid email address"),
+  email: z.string().email("Please enter a valid email address"),
   phone: z
     .string()
     .regex(
@@ -31,11 +31,13 @@ function Loan() {
   const [transactionStatus, setTransactionStatus] = useState(null);
   const [transactionId, setTransactionId] = useState(null);
   const [pollingCount, setPollingCount] = useState(0);
+  const [apiError, setApiError] = useState(null);
 
   const {
     register,
     handleSubmit,
     setValue,
+    setError,
     reset,
     formState: { errors, isSubmitting },
   } = useForm({
@@ -144,7 +146,8 @@ function Loan() {
   const handleLoanSelect = (loan) => {
     setSelectedLoan(loan);
     setCustomAmount("");
-    setValue("loan_amount", loan.range, { shouldValidate: true });
+    // Set the default value to the minimum of the range
+    setValue("loan_amount", loan.min.toString(), { shouldValidate: true });
     setShowLoanOptions(false);
     setShowForm(true);
   };
@@ -162,7 +165,7 @@ function Loan() {
         custom: true,
       });
 
-      setValue("loan_amount", amount.toLocaleString(), {
+      setValue("loan_amount", amount.toString(), {
         shouldValidate: true,
       });
       setShowLoanOptions(false);
@@ -180,14 +183,15 @@ function Loan() {
         body: JSON.stringify(applicationData),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        const data = await response.json();
         return { success: true, data };
       } else {
-        const errorData = await response.json();
         return {
           success: false,
-          error: errorData.message || "Failed to submit application",
+          error: data,
+          statusCode: response.status
         };
       }
     } catch (error) {
@@ -195,9 +199,45 @@ function Loan() {
     }
   };
 
+  const handleLoanAmountChange = (e) => {
+    const value = e.target.value.replace(/,/g, "");
+    if (value === "" || /^\d+$/.test(value)) {
+      const amount = parseInt(value) || 0;
+
+      // Validate if amount is within selected range
+      if (selectedLoan && !selectedLoan.custom) {
+        if (amount < selectedLoan.min || amount > selectedLoan.max) {
+          setError("loan_amount", {
+            type: "manual",
+            message: `Amount must be between ${selectedLoan.min.toLocaleString()} and ${selectedLoan.max.toLocaleString()}`
+          });
+        } else {
+          // Clear the error if validation passes
+          setError("loan_amount", {});
+        }
+      }
+
+      setValue("loan_amount", value, { shouldValidate: true });
+    }
+  };
+
   const onSubmit = async (data) => {
-    const loanAmount = selectedLoan?.custom ? customAmount : selectedLoan?.max;
-    const fee = selectedLoan?.fee || calculateFee(customAmount);
+    setApiError(null);
+
+    // Final validation for loan amount within range
+    if (selectedLoan && !selectedLoan.custom) {
+      const loanAmount = parseInt(data.loan_amount);
+      if (loanAmount < selectedLoan.min || loanAmount > selectedLoan.max) {
+        setError("loan_amount", {
+          type: "manual",
+          message: `Amount must be between ${selectedLoan.min.toLocaleString()} and ${selectedLoan.max.toLocaleString()}`
+        });
+        return;
+      }
+    }
+
+    const loanAmount = selectedLoan?.custom ? customAmount : data.loan_amount;
+    const fee = selectedLoan?.fee || calculateFee(loanAmount);
 
     const applicationData = {
       ...data,
@@ -214,7 +254,21 @@ function Loan() {
       setTransactionId(result.data.data.stkResponse.external_reference);
     } else {
       setTransactionStatus("failed");
-      alert(`Application failed: ${result.error}`);
+
+      // Handle specific API errors
+      if (result.statusCode === 409) {
+        // Duplicate email error
+        setApiError(result.error.message?.message || "An application with this email already exists");
+        setError("email", {
+          type: "manual",
+          message: "An application with this email already exists"
+        });
+      } else {
+        // Generic error
+        const errorMessage = result.error?.message?.message || result.error || "Failed to submit application";
+        setApiError(errorMessage);
+        alert(`Application failed: ${errorMessage}`);
+      }
     }
   };
 
@@ -235,11 +289,16 @@ function Loan() {
     setTransactionStatus(null);
     setTransactionId(null);
     setPollingCount(0);
+    setApiError(null);
   };
 
   const currentFee = customAmount
     ? calculateFee(customAmount)
     : selectedLoan?.fee || 0;
+
+  const currentLoanAmount = selectedLoan?.custom
+    ? customAmount
+    : (selectedLoan ? formatAmount(selectedLoan.min) : "");
 
   const LoadingSpinner = () => (
     <div className="flex flex-col items-center justify-center p-8">
@@ -306,7 +365,7 @@ function Loan() {
         Application Failed
       </h3>
       <p className="text-gray-600 mb-4">
-        There was an error processing your application. Please try again.
+        {apiError || "There was an error processing your application. Please try again."}
       </p>
       <button
         onClick={resetForm}
@@ -318,7 +377,7 @@ function Loan() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white pt-16 md:pt-20">
+    <div className="min-h-screen bg-linear-to-b from-purple-50 to-white pt-16 md:pt-20">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-8 md:py-12 lg:py-20">
         {/* Header */}
         <div className="text-center mb-8 md:mb-12 lg:mb-16">
@@ -358,7 +417,7 @@ function Loan() {
               key={index}
               className="text-center bg-white rounded-2xl shadow-sm p-6 md:p-8 hover:shadow-md transition-shadow duration-300"
             >
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-xl md:text-2xl text-white mx-auto mb-4 md:mb-6 relative">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-linear-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-xl md:text-2xl text-white mx-auto mb-4 md:mb-6 relative">
                 <span className="text-2xl md:text-3xl">{step.icon}</span>
                 <div className="absolute -top-2 -right-2 w-6 h-6 md:w-8 md:h-8 bg-purple-700 rounded-full flex items-center justify-center text-white text-xs md:text-sm font-bold">
                   {step.step}
@@ -378,7 +437,7 @@ function Loan() {
         <div className="text-center">
           <button
             onClick={handleApplyLoan}
-            className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 md:px-8 md:py-4 rounded-lg text-base md:text-lg font-semibold hover:from-purple-700 hover:to-purple-800 transition-all duration-300 transform hover:scale-105 shadow-lg w-full max-w-xs mx-auto"
+            className="bg-linear-to-r from-purple-600 to-purple-700 text-white px-6 py-3 md:px-8 md:py-4 rounded-lg text-base md:text-lg font-semibold hover:from-purple-700 hover:to-purple-800 transition-all duration-300 transform hover:scale-105 shadow-lg w-full max-w-xs mx-auto"
           >
             Apply for Loan
           </button>
@@ -499,13 +558,18 @@ function Loan() {
                     </h2>
                     <p className="text-purple-600 font-semibold mt-1 text-sm md:text-base">
                       {selectedLoan.custom
-                        ? `Amount: KSH ${formatAmount(customAmount)}`
-                        : `Selected: KSH ${selectedLoan.range}`}
+                        ? `Custom Amount`
+                        : `Selected Range: KSH ${selectedLoan.range}`}
                     </p>
+                    {!selectedLoan.custom && (
+                      <p className="text-gray-600 text-xs mt-1">
+                        Enter amount between {selectedLoan.min.toLocaleString()} and {selectedLoan.max.toLocaleString()}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={resetForm}
-                    className="text-gray-500 hover:text-gray-700 text-2xl md:text-3xl flex-shrink-0"
+                    className="text-gray-500 hover:text-gray-700 text-2xl md:text-3xl shrink-0"
                   >
                     ×
                   </button>
@@ -600,9 +664,23 @@ function Loan() {
                       type="text"
                       id="loan_amount"
                       {...register("loan_amount")}
-                      readOnly
-                      className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg bg-gray-50 text-sm md:text-base"
+                      onChange={handleLoanAmountChange}
+                      className={`w-full px-3 py-2 md:px-4 md:py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm md:text-base ${
+                        errors.loan_amount ? "border-red-500" : "border-gray-300"
+                      } ${selectedLoan.custom ? "bg-gray-50" : ""}`}
+                      placeholder={selectedLoan.custom ? "" : `Enter amount between ${selectedLoan.min.toLocaleString()} and ${selectedLoan.max.toLocaleString()}`}
+                      readOnly={selectedLoan.custom}
                     />
+                    {errors.loan_amount && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.loan_amount.message}
+                      </p>
+                    )}
+                    {!selectedLoan.custom && (
+                      <p className="text-gray-500 text-xs mt-1">
+                        Available range: {selectedLoan.min.toLocaleString()} - {selectedLoan.max.toLocaleString()}
+                      </p>
+                    )}
                   </div>
 
                   <div className="bg-gray-50 rounded-lg p-3 md:p-4">
@@ -618,7 +696,7 @@ function Loan() {
                           KSH{" "}
                           {selectedLoan.custom
                             ? formatAmount(customAmount)
-                            : selectedLoan.range}
+                            : (formatAmount(selectedLoan.min) + " - " + formatAmount(selectedLoan.max))}
                         </span>
                       </div>
                       <div className="flex justify-between text-xs md:text-sm">
@@ -636,7 +714,7 @@ function Loan() {
                             KSH{" "}
                             {selectedLoan.custom
                               ? formatAmount(customAmount)
-                              : selectedLoan.range}
+                              : (formatAmount(selectedLoan.min) + " - " + formatAmount(selectedLoan.max))}
                           </span>
                         </div>
                       </div>
@@ -671,7 +749,7 @@ function Loan() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="flex-1 px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 font-medium text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-4 py-2 md:px-6 md:py-3 bg-linear-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 font-medium text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? "Submitting..." : "Submit Application"}
                     </button>
