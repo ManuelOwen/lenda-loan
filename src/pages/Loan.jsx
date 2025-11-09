@@ -145,8 +145,7 @@ function Loan() {
 
   const handleLoanSelect = (loan) => {
     setSelectedLoan(loan);
-    setCustomAmount("");
-    // Set the default value to the minimum of the range
+    setCustomAmount("")
     setValue("loan_amount", loan.min.toString(), { shouldValidate: true });
     setShowLoanOptions(false);
     setShowForm(true);
@@ -204,7 +203,6 @@ function Loan() {
     if (value === "" || /^\d+$/.test(value)) {
       const amount = parseInt(value) || 0;
 
-      // Validate if amount is within selected range
       if (selectedLoan && !selectedLoan.custom) {
         if (amount < selectedLoan.min || amount > selectedLoan.max) {
           setError("loan_amount", {
@@ -212,7 +210,7 @@ function Loan() {
             message: `Amount must be between ${selectedLoan.min.toLocaleString()} and ${selectedLoan.max.toLocaleString()}`
           });
         } else {
-          // Clear the error if validation passes
+  
           setError("loan_amount", {});
         }
       }
@@ -223,8 +221,6 @@ function Loan() {
 
   const onSubmit = async (data) => {
     setApiError(null);
-
-    // Final validation for loan amount within range
     if (selectedLoan && !selectedLoan.custom) {
       const loanAmount = parseInt(data.loan_amount);
       if (loanAmount < selectedLoan.min || loanAmount > selectedLoan.max) {
@@ -255,16 +251,15 @@ function Loan() {
     } else {
       setTransactionStatus("failed");
 
-      // Handle specific API errors
       if (result.statusCode === 409) {
-        // Duplicate email error
+
         setApiError(result.error.message?.message || "An application with this email already exists");
         setError("email", {
           type: "manual",
           message: "An application with this email already exists"
         });
       } else {
-        // Generic error
+
         const errorMessage = result.error?.message?.message || result.error || "Failed to submit application";
         setApiError(errorMessage);
         alert(`Application failed: ${errorMessage}`);
